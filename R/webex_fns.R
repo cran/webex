@@ -1,13 +1,23 @@
 #' Create a fill-in-the-blank question
 #'
-#' @param answer The correct answer (can be a vector if there is more than one correct answer).
-#' @param width Width of the input box in characters. Defaults to the length of the longest answer.
-#' @param num Whether the input is numeric, in which case allow for leading zeroes to be omitted.
-#' @param tol The tolerance within which numeric answers will be accepted; i.e. if \code{abs(response - true.answer) < tol}, the answer is correct (implies \code{num=TRUE}).
+#' @param answer The correct answer (can be a vector if there is more
+#'   than one correct answer).
+#' @param width Width of the input box in characters. Defaults to the
+#'   length of the longest answer.
+#' @param num Whether the input is numeric, in which case allow for
+#'   leading zeroes to be omitted. Determined from the answer data
+#'   type if not specified.
+#' @param tol The tolerance within which numeric answers will be
+#'   accepted; i.e. if \code{abs(response - true.answer) < tol}, the
+#'   answer is correct (implies \code{num=TRUE}).
 #' @param ignore_case Whether to ignore case (capitalization).
 #' @param ignore_ws Whether to ignore whitespace.
-#' @param regex Whether to use regex to match answers (concatenates all answers with `|` before matching).
-#' @details Writes html code that creates an input box widget. Call this function inline in an RMarkdown document. See the Web Exercises RMarkdown template for examples of its use in RMarkdown.
+#' @param regex Whether to use regex to match answers (concatenates
+#'   all answers with `|` before matching).
+#' @details Writes html code that creates an input box widget. Call
+#'   this function inline in an RMarkdown document. See the Web
+#'   Exercises RMarkdown template for examples of its use in
+#'   RMarkdown.
 #' @examples
 #' # What is 2 + 2?
 #' fitb(4, num = TRUE)
@@ -20,17 +30,25 @@
 #' @export
 fitb <- function(answer, 
                  width = calculated_width, 
-                 num = FALSE,
+                 num = NULL,
                  ignore_case = FALSE,
                  tol = NULL,
                  ignore_ws = TRUE, 
                  regex = FALSE) {
+  # make sure answer is a numeric or character vector
+  answer <- unlist(answer)
+  if (!is.vector(answer) ||
+      (!is.numeric(answer) && !is.character(answer))) {
+    stop("The answer must be a vector of characters or numbers.")
+  }
   
+  # set numeric based on data type if num is NULL
+  if (is.null(num)) num <- is.numeric(answer)
   
-  if(!is.null(tol)){
-    num <- TRUE
-  } 
+  # if tol is set, assume numeric
+  if (!is.null(tol)) num <- TRUE
 
+  # add zero-stripped versions if numeric
   if (num) {
     answer2 <- strip_lzero(answer)
     answer <- union(answer, answer2)
@@ -42,7 +60,7 @@ fitb <- function(answer,
   answers <- jsonlite::toJSON(as.character(answer))
   answers <- gsub("\'", "&apos;", answers, fixed = TRUE)
   
-  paste0("<input class='solveme",
+  paste0("<input class='webex-solveme",
          ifelse(ignore_ws, " nospaces", ""),
          ifelse(!is.null(tol), paste0("' data-tol='", tol, ""), ""),
          ifelse(ignore_case, " ignorecase", ""),
@@ -53,8 +71,12 @@ fitb <- function(answer,
 
 #' Create a multiple-choice question
 #'
-#' @param opts Vector of alternatives. The correct answer is the element(s) of this vector named 'answer'. 
-#' @details Writes html code that creates an option box widget, with a single correct answer. Call this function inline in an RMarkdown document. See the Web Exercises RMarkdown template for further examples.
+#' @param opts Vector of alternatives. The correct answer is the
+#'   element(s) of this vector named 'answer'.
+#' @details Writes html code that creates an option box widget, with a
+#'   single correct answer. Call this function inline in an RMarkdown
+#'   document. See the Web Exercises RMarkdown template for further
+#'   examples.
 #' @examples
 #' # How many planets orbit closer to the sun than the Earth?
 #' mcq(c(1, answer = 2, 3))
@@ -69,11 +91,12 @@ mcq <- function(opts) {
   }
   answers <- jsonlite::toJSON(as.character(opts[ix]))
   answers <- gsub("\'", "&apos;", answers, fixed = TRUE)
-  
+
+  opts2 <- gsub("\'", "&apos;", opts, fixed = TRUE)
   options <- paste0(" <option>",
-                    paste(c("", opts), collapse = "</option> <option>"),
+                    paste(c("", opts2), collapse = "</option> <option>"),
                     "</option>")
-  paste0("<select class='solveme' data-answer='", answers, "'>",
+  paste0("<select class='webex-solveme' data-answer='", answers, "'>",
          options, "</select>")
 }
 
@@ -110,7 +133,7 @@ torf <- function(answer) {
 #' hide("Click here for a hint")
 #' @export
 hide <- function(button_text = "Solution") {
-  paste0("\n<div class='solution'><button>", button_text, "</button>\n")
+  paste0("\n<div class='webex-solution'><button>", button_text, "</button>\n")
 }
 
 #' End hidden HTML content
@@ -129,7 +152,7 @@ unhide <- function() {
 #'
 #' @param default The colour of the widgets when the correct answer is not filled in (defaults to blue).
 #' @param correct The colour of the widgets when the correct answer not filled in (defaults to red).
-#' @details Call this function inline in an RMarkdown document to change the default and correct colours using any valid HTML colour word (e.g., red, rgb(255,0,0), hsl(0, 100%, 50%) or #FF0000).
+#' @details Call this function inline in an RMarkdown document to change the default and correct colours using any valid CSS colour word (e.g., red, rgb(255,0,0), hsl(0, 100%, 50%) or #FF0000).
 #' @examples
 #' # change to green when correct
 #' style_widgets(correct = "green")
@@ -137,13 +160,31 @@ unhide <- function() {
 #' # yellow when unfilled, pink when correct
 #' style_widgets("#FFFF00", "#FF3399")
 #' @export
-style_widgets <- function(default = "blue", correct = "red") {
+style_widgets <- function(default = "red", correct = "blue") {
   paste0(
     "\n<style>\n",
-    "    .solveme { border-color: ", default,"; }\n",
-    "    .solveme.correct { border-color: ", correct,"; }\n",
+    "    .webex-solveme { border-color: ", default,"; }\n",
+    "    .webex-solveme.webex-correct { border-color: ", correct,"; }\n",
     "</style>\n\n"
   )
+}
+
+#' Display total correct
+#'
+#' @param elem The html element to display (e.g., div, h3, p, span)
+#' @param args Optional arguments for css classes or styles
+#'
+#' @return A string with the html for displaying a total correct element
+#' @export
+#'
+#' @examples
+#' total_correct()     # <div  id="total_correct"></div>
+#' total_correct("h3") # <h3  id="total_correct"></h3>
+#' total_correct("p", "style='color: red;'")
+#' total_correct("div", "class='customclass'")
+total_correct <- function(elem = "span", args = "") {
+  sprintf("<%s %s id=\"webex-total_correct\"></%s>\n\n", 
+              elem, args, elem)
 }
 
 #' Round up from .5
@@ -175,4 +216,17 @@ round2 <- function(x, digits = 0) {
 #' @export
 strip_lzero <- function(x) {
   sub("^([+-]*)0\\.", "\\1.", x)
+}
+
+#' Escape a string for regex
+#'
+#' @param string A string to escape
+#'
+#' @return A string 
+#' @export
+#'
+#' @examples
+#' escape_regex("library(tidyverse)")
+escape_regex <- function(string) {
+  gsub("([.|()\\^{}+$*?]|\\[|\\])", "\\\\\\1", string)
 }
